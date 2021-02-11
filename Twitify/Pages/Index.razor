@@ -1,0 +1,40 @@
+﻿@page "/"
+@using Tweetinvi
+@using Tweetinvi.Auth
+@using Twitify.Data
+@inject NavigationManager navManager
+<div style="width: 350px; height: 355px; color: white; position: relative; margin: auto;">
+    <div style="margin-left: auto;margin-right: auto; width:300px; padding-top: 20px;">
+        <img class="card-avatar" src="/images/logo.png" style="width: 300px; height: 300px; border-radius: 50%;" alt="avatar">
+    </div>
+    <div style="text-align: center;padding-top: 50px;">
+        <button style="background: #94bbe9; border-radius: 15px; width: 150px; height: 75px; font-size: 45px; " class="btn btn-primary" @onclick="Login">Giriş</button>
+    </div>
+</div>
+@code {
+
+    private string _authUri;
+    protected async Task Login()
+    {
+        navManager.NavigateTo(_authUri, forceLoad: true);
+    }
+    protected override void OnInitialized()
+    {
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        var appClient = new TwitterClient(TwitifyController.ConsumerKey, TwitifyController.ConsumerSecret);
+        var authenticationRequestId = Guid.NewGuid().ToString();
+        var redirectPath = TwitifyController.TwitterUri;
+
+        // Add the user identifier as a query parameters that will be received by `ValidateTwitterAuth`
+        var redirectURL = TwitifyController._myAuthRequestStore.AppendAuthenticationRequestIdToCallbackUrl(redirectPath, authenticationRequestId);
+        // Initialize the authentication process
+        var authenticationRequestToken = await appClient.Auth.RequestAuthenticationUrlAsync(redirectURL);
+        // Store the token information in the store
+        await TwitifyController._myAuthRequestStore.AddAuthenticationTokenAsync(authenticationRequestId, authenticationRequestToken);
+
+        // Redirect the user to Twitter
+        _authUri = authenticationRequestToken.AuthorizationURL;
+    }
+}

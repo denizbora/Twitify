@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <UserSecretsId>7119ebd8-7cde-4a34-a180-da4f09060a95</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SpotifyAPI.Web" Version="6.0.0" />
+    <PackageReference Include="SpotifyAPI.Web.Auth" Version="6.0.0" />
+    <PackageReference Include="TweetinviAPI" Version="5.0.3" />
+  </ItemGroup>
+
+</Project>

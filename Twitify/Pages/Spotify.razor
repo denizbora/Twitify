@@ -1,0 +1,120 @@
+﻿@page "/Account"
+@inject NavigationManager navManager
+@using SpotifyAPI.Web
+@using Tweetinvi
+@using Tweetinvi.Parameters
+@using Twitify.Data
+@using System.Threading
+@using Microsoft.AspNetCore.Http;
+@using Tweetinvi.Models
+@inject IJSRuntime JsRuntime;
+@if (_isAuthed && _me != null)
+{<div style="width: 350px; height: 355px; background: rgba(244,107,167,0.24413515406162467); border-radius: 10%; color: white; position: relative; margin: auto;">
+     <div style="margin-left: auto;margin-right: auto; width:100px; padding-top: 20px;">
+         <img class="card-avatar" src="@Profile" style="width: 100px; height: 100px; border-radius: 50%;" alt="avatar">
+     </div>
+     <div style="text-align: center;padding-top: 15px;">
+         <h1 style="font-size: 22px; font-family: 'Jost', sans-serif;">@UserName</h1>
+         <h1 style="font-size: 15px; font-family: 'Jost', sans-serif;">@descriptions</h1>
+     </div>
+     <div style="text-align: center;padding-top: 15px;">
+         <a class="twitter" href="https://twitter.com/@UserName" target="_blank"><img style="vertical-align: middle;" src="/images/Twitter.png" alt="twitter"></a>
+         <a class="spotify" href="@Spoti" target="_blank"><img style="vertical-align: middle;" src="/images/Spotify.png" alt="Spotify"></a>
+     </div>
+     <div style="text-align: center;padding-top: 15px;">
+         <h2 style="font-size: 15px;padding-bottom: 15px;">@counter Saniye sonra biyografiniz değişecek.</h2>
+         <button style="background: #94bbe9; border: none" class="btn btn-primary"@onclick="Exit">Çıkış</button>
+     </div>
+	
+ </div>
+}
+else
+{
+}
+
+@code {
+    private bool _isAuthed;
+    private PrivateUser _me;
+    private string singer;
+    private string descriptions;
+    private string trackname;
+    private CurrentlyPlaying _currentlyPlaying;
+    private TwitterClient userClient;
+    private static System.Timers.Timer aTimer;
+    private int counter = 20;
+    private string UserName;
+    private string Profile;
+    private string Spoti;
+
+    protected async Task Exit()
+    {
+        await userClient.AccountSettings.UpdateProfileAsync(new UpdateProfileParameters()
+        {
+            Description = await JsRuntime.InvokeAsync<string>("ReadCookie.ReadCookie", "Bio")
+        });
+        navManager.NavigateTo($"/", forceLoad: true);
+    }
+    public void CountDownTimer(Object source, System.Timers.ElapsedEventArgs e)
+    {
+        if (counter > 0)
+        {
+            counter -= 1;
+        }
+        else
+        {
+            Uri baseUri = TwitifyController.SpotifyUri;
+
+            var loginRequest = new LoginRequest(baseUri, TwitifyController.clientId, LoginRequest.ResponseType.Token)
+            {
+                Scope = new[] { Scopes.UserReadPlaybackState, Scopes.UserReadEmail, Scopes.UserReadCurrentlyPlaying }
+            };
+            navManager.NavigateTo(loginRequest.ToUri().ToString());
+        }
+        InvokeAsync(StateHasChanged);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        aTimer = new System.Timers.Timer(1000);
+        aTimer.Elapsed += CountDownTimer;
+        aTimer.Enabled = true;
+        var uri = new Uri(navManager.Uri);
+        var maxLen = Math.Min(1, uri.Fragment.Length);
+        Dictionary<string, string> fragmentParams = uri.Fragment.Substring(maxLen)?
+          .Split("&", StringSplitOptions.RemoveEmptyEntries)?
+          .Select(param => param.Split("=", StringSplitOptions.RemoveEmptyEntries))?
+          .ToDictionary(param => param[0], param => param[1]) ?? new Dictionary<string, string>();
+
+        _isAuthed = fragmentParams.ContainsKey("access_token");
+        if (_isAuthed)
+        {
+            var spotify = new SpotifyClient(fragmentParams["access_token"]);
+            _me = await spotify.UserProfile.Current();
+            //Change market value with your country tag
+            Spoti = (spotify.UserProfile.Current().Result.Uri);
+            _currentlyPlaying = (await spotify.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest() { Market = "TR" }));
+            if (_currentlyPlaying == null)
+            {
+                //Change trackname with your standart bio
+                descriptions = await JsRuntime.InvokeAsync<string>("ReadCookie.ReadCookie", "Bio");
+
+            }
+            else if (_currentlyPlaying.Item is FullTrack track)
+            {
+                trackname = track.Name;
+                singer = track.Artists[0].Name;
+                descriptions = "🎧 " + singer + " - " + trackname;
+            }
+            var AccessTokenSecret = await JsRuntime.InvokeAsync<string>("ReadCookie.ReadCookie", "AccessTokenSecret");
+            var AccessToken = await JsRuntime.InvokeAsync<string>("ReadCookie.ReadCookie", "AccessToken");
+            UserName= await JsRuntime.InvokeAsync<string>("ReadCookie.ReadCookie", "UserName");
+            Profile = await JsRuntime.InvokeAsync<string>("ReadCookie.ReadCookie", "Profile");
+            userClient = new TwitterClient(new TwitterCredentials(TwitifyController.ConsumerKey, TwitifyController.ConsumerSecret, AccessToken, AccessTokenSecret));
+            await userClient.AccountSettings.UpdateProfileAsync(new UpdateProfileParameters()
+            {
+                Description = descriptions
+            });
+        }
+    }
+
+
+}
